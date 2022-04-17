@@ -1,12 +1,70 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import {
+  useConnectWallet,
+  useSetChain,
+  useWallets,
+  web3Onboard
+} from '@web3-onboard/react'
+import { initOnboard } from '../utils/onboard'
 
 const Mint = () => {
+  const [{ wallet, connecting }, connect, disconnect] = useConnectWallet()
+  const [{ chains, connectedChain, settingChain }, setChain] = useSetChain()
+  const connectedWallets = useWallets()
+
   const [paused, setPaused] = useState(false)
 
   const [isPublicSale, setIsPublicSale] = useState(false)
   const [isPreSale, setIsPreSale] = useState(false)
 
   const [walletAddress, setWalletAddress] = useState('')
+
+  // Minting status
+  const [status, setStatus] = useState(null)
+  const [mintAmount, setMintAmount] = useState(1)
+  const [isMinting, setIsMinting] = useState(false)
+
+  const [onboard, setOnboard] = useState(null)
+
+  useEffect(() => {
+    setOnboard(initOnboard)
+  }, [])
+
+  useEffect(() => {
+    console.log('connectedWallets =>', connectedWallets)
+    if (!connectedWallets.length) return
+
+    const connectedWalletsLabelArray = connectedWallets.map(
+      ({ label }) => label
+    )
+    window.localStorage.setItem(
+      'connectedWallets',
+      JSON.stringify(connectedWalletsLabelArray)
+    )
+  }, [connectedWallets])
+
+  useEffect(() => {
+    console.log('onboard', onboard)
+    console.log('wallet => ', wallet)
+    if (!onboard) return
+
+    const previouslyConnectedWallets = JSON.parse(
+      window.localStorage.getItem('connectedWallets')
+    )
+
+    if (previouslyConnectedWallets?.length) {
+      async function setWalletFromLocalStorage() {
+        await connect({
+          autoSelect: {
+            label: previouslyConnectedWallets[0],
+            disableModals: true
+          }
+        })
+      }
+
+      setWalletFromLocalStorage()
+    }
+  }, [onboard, connect])
 
   return (
     <div className="flex h-full min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-brand-background">
@@ -21,10 +79,11 @@ const Mint = () => {
               {paused ? 'Paused' : isPreSale ? 'Pre-Sale' : 'Public Sale'}
             </h1>
             <h3 className="text-sm tracking-widest text-pink-200">
-              {/* {walletAddress
-                ? walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4)
-                : ''} */}
-              0x973DDbc831835a75AD3d024378820560f99F2A2e
+              {wallet?.accounts[0]?.address
+                ? wallet?.accounts[0]?.address.slice(0, 8) +
+                  '.....' +
+                  wallet?.accounts[0]?.address.slice(-6)
+                : ''}
             </h3>
 
             <div className="mt-10 flex w-full flex-col md:mt-14 md:flex-row md:space-x-14">
@@ -79,15 +138,25 @@ const Mint = () => {
               </div>
 
               {/* Mint Button && Connect Wallet Button */}
-              <div
-                className="mx-4 mt-12 w-full rounded-md bg-gradient-to-br
-                     from-brand-purple to-brand-pink px-6 py-3 text-center font-coiny 
-                     text-2xl uppercase  tracking-wide text-white shadow-lg
-                      hover:shadow-pink-400/50
-                     "
-              >
-                ConnectWallet
-              </div>
+              {wallet ? (
+                <button
+                  className={` ${
+                    paused || isMinting
+                      ? 'cursor-not-allowed bg-gray-900'
+                      : 'bg-gradient-to-br from-brand-purple to-brand-pink shadow-lg hover:shadow-pink-400/50'
+                  } mx-4 mt-12 w-full rounded-md px-6 py-3 font-coiny text-2xl  uppercase tracking-wide text-white`}
+                  disabled={paused || isMinting}
+                >
+                  {isMinting ? 'Minting...' : 'Mint'}
+                </button>
+              ) : (
+                <button
+                  className="mx-4 mt-12 w-full rounded-md bg-gradient-to-br from-brand-purple to-brand-pink px-6 py-3 font-coiny text-2xl uppercase tracking-wide text-white shadow-lg hover:shadow-pink-400/50"
+                  onClick={() => connect()}
+                >
+                  Connect Wallet
+                </button>
+              )}
 
               {/* Status */}
 
